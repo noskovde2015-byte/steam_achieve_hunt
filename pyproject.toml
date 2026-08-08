@@ -1,0 +1,12 @@
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.13.1"
+fastapi = "^0.141.1"
+uvicorn = {extras = ["standart"], version = "^0.52.1"}
+asyncpg = "^0.31.0"
+sqlalchemy = "^2.0.51"
+pydantic = {extras = ["email"], version = "^2.13.4"}
+pydantic-settings = "^2.15.0"
+alembic = "^1.19.0"
