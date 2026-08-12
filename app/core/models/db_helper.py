@@ -33,7 +33,7 @@ class DataBaseHelper:
         await self.engine.dispose()
 
 db_helper = DataBaseHelper(
-    url=settings.db.url,
+    url=str(settings.db.url),
     echo=settings.db.echo,
     echo_pool=settings.db.echo_pool,
     max_overflow=settings.db.max_overflow,
