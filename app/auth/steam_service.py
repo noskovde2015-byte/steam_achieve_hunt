@@ -1,3 +1,4 @@
+from select import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 from core.models import User
@@ -37,5 +38,17 @@ async def verify_steam_response(params: dict) -> str | None:
 
 
 async def get_or_create_user(steam_id: str, session: AsyncSession) -> User:
-    ...
+    stmt = select(User).where(User.steam_id == steam_id)
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        new_user = User(steam_id=steam_id)
+        session.add(new_user)
+        await session.commit()
+        await session.refresh(new_user)
+        return new_user
+    else:
+        return user
+
 
