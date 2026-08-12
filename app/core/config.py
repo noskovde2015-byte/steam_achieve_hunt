@@ -9,7 +9,10 @@ class RunConfig(BaseModel):
 
 
 class ApiPrefix(BaseModel):
-    pass
+    prefix: str = "/api"
+    auth_prefix: str = "/auth"
+    leaderboard_prefix: str = "/leaderboard"
+    profile_prefix: str = "/profile"
 
 class DataBaseConfig(BaseModel):
     url: PostgresDsn

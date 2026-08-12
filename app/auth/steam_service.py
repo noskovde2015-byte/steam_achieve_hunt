@@ -1,4 +1,4 @@
-from select import select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 from core.models import User
