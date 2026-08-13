@@ -22,6 +22,10 @@ class DataBaseConfig(BaseModel):
     max_overflow: int = 10
 
 
+class SteamConfig(BaseModel):
+    api_key: str
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=Path(__file__).parent.parent / ".env",
@@ -33,6 +37,7 @@ class Settings(BaseSettings):
     run: RunConfig = RunConfig()
     api_prefix: ApiPrefix = ApiPrefix()
     db: DataBaseConfig
+    steam: SteamConfig
 
 
 settings = Settings()
