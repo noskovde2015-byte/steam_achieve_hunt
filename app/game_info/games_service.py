@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,5 +60,39 @@ async def sync_user_game(user_id: int, appid: int, session: AsyncSession) -> Use
     user_achievements = await get_player_achievements(
         steam_id=user.steam_id, appid=appid
     )
+    total_achievements = await get_schema_for_game(appid=appid)
 
-    game_achievements = await get_schema_for_game(appid=appid)
+    unlocked_count = sum(1 for a in user_achievements if a["achieved"] == 1)
+
+    is_platinum = unlocked_count == total_achievements
+    platinum_time = None
+
+    if is_platinum:
+        platinum_timestamp = max(
+            a["unlocktime"] for a in user_achievements if a["achieved"] == 1
+        )
+
+        platinum_time = datetime.fromtimestamp(
+            platinum_timestamp,
+            tz=timezone.utc,
+        )
+    stmt = select(UserGame).where(
+        UserGame.user_id == user_id, UserGame.game_id == appid
+    )
+    res = await session.execute(stmt)
+    user_game = res.scalar_one_or_none()
+
+    if user_game is None:
+        user_game = UserGame(
+            user_id=user_id,
+            game_id=appid,
+        )
+        session.add(user_game)
+
+    user_game.is_platinum = is_platinum
+    user_game.platinum_at = platinum_time
+
+    await session.commit()
+    await session.refresh(user_game)
+
+    return user_game
