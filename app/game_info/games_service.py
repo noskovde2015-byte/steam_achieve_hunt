@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models.user_game import UserGame
 from app.core.models.user import User
+from app.core.models.game import Game
 from app.core.config import settings
 
 
@@ -37,7 +38,7 @@ async def get_player_achievements(steam_id: str, appid: int) -> list[dict]:
     return data["playerstats"]["achievements"]
 
 
-async def get_schema_for_game(appid: int) -> int:
+async def get_schema_for_game(appid: int) -> tuple[str, int]:
     async with httpx.AsyncClient() as client:
         response = await client.get(
             "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/",
@@ -48,8 +49,9 @@ async def get_schema_for_game(appid: int) -> int:
         )
 
     data = response.json()
+    game_name = data["game"]["gameName"]
     achievements = data["game"]["availableGameStats"].get("achievements", [])
-    return len(achievements)
+    return game_name, len(achievements)
 
 
 async def sync_user_game(user_id: int, appid: int, session: AsyncSession) -> UserGame:
@@ -60,37 +62,46 @@ async def sync_user_game(user_id: int, appid: int, session: AsyncSession) -> Use
     user_achievements = await get_player_achievements(
         steam_id=user.steam_id, appid=appid
     )
-    total_achievements = await get_schema_for_game(appid=appid)
+    game_name, total_achievements = await get_schema_for_game(appid=appid)
 
     unlocked_count = sum(1 for a in user_achievements if a["achieved"] == 1)
+    is_platinum = total_achievements > 0 and unlocked_count == total_achievements
 
-    is_platinum = unlocked_count == total_achievements
     platinum_time = None
-
     if is_platinum:
         platinum_timestamp = max(
             a["unlocktime"] for a in user_achievements if a["achieved"] == 1
         )
-
         platinum_time = datetime.fromtimestamp(
-            platinum_timestamp,
-            tz=timezone.utc,
-        )
-    stmt = select(UserGame).where(
-        UserGame.user_id == user_id, UserGame.game_id == appid
+            platinum_timestamp, tz=timezone.utc
+        ).replace(tzinfo=None)
+
+    game_stmt = select(Game).where(Game.appid == appid)
+    game_result = await session.execute(game_stmt)
+    game = game_result.scalar_one_or_none()
+
+    if game is None:
+        game = Game(appid=appid, name=game_name, total_achievements=total_achievements)
+        session.add(game)
+        await session.flush()
+    else:
+        game.name = game_name
+        game.total_achievements = total_achievements
+
+    user_game_stmt = select(UserGame).where(
+        UserGame.user_id == user_id, UserGame.game_id == game.id
     )
-    res = await session.execute(stmt)
-    user_game = res.scalar_one_or_none()
+    user_game_result = await session.execute(user_game_stmt)
+    user_game = user_game_result.scalar_one_or_none()
 
     if user_game is None:
-        user_game = UserGame(
-            user_id=user_id,
-            game_id=appid,
-        )
+        user_game = UserGame(user_id=user_id, game_id=game.id)
         session.add(user_game)
 
+    user_game.achievements_unlocked = unlocked_count
     user_game.is_platinum = is_platinum
     user_game.platinum_at = platinum_time
+    user_game.last_synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await session.commit()
     await session.refresh(user_game)
