@@ -34,8 +34,8 @@ async def verify_steam_response(params: dict) -> str | None:
 
     if "is_valid:true" in response.text:
         parsed = params["openid.claimed_id"]
-        user_id = parsed.split("/")[-1]
-        return user_id
+        steam_id = parsed.split("/")[-1]
+        return steam_id
     else:
         return None
 
