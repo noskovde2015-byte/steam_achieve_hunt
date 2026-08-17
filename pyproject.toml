@@ -11,3 +11,4 @@ pydantic = {extras = ["email"], version = "^2.13.4"}
 pydantic-settings = "^2.15.0"
 alembic = "^1.19.0"
 pyjwt = "^2.13.0"
+python-jose = "^3.5.0"
