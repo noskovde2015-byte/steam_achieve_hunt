@@ -47,13 +47,20 @@ async def steam_callback(
     refresh_token = create_refresh_token()
     await save_refresh_token(user_id=user.id, token=refresh_token, session=session)
 
-    response.set_cookie("access_token", access_token, httponly=True, samesite="lax")
+    response.set_cookie(
+        "access_token",
+        access_token,
+        httponly=True,
+        samesite="lax",
+        max_age=settings.auth.access_token_expire_minutes * 60,
+    )
     response.set_cookie(
         "refresh_token",
         refresh_token,
         httponly=True,
         samesite="lax",
         path="/api/auth/refresh",
+        max_age=settings.auth.refresh_token_expire_days * 24 * 60 * 60,
     )
 
     return {
@@ -81,13 +88,20 @@ async def refresh(
     new_refresh_token = create_refresh_token()
     await save_refresh_token(user_id=user.id, token=new_refresh_token, session=session)
 
-    response.set_cookie("access_token", access_token, httponly=True, samesite="lax")
+    response.set_cookie(
+        "access_token",
+        access_token,
+        httponly=True,
+        samesite="lax",
+        max_age=settings.auth.access_token_expire_minutes * 60,
+    )
     response.set_cookie(
         "refresh_token",
         new_refresh_token,
         httponly=True,
         samesite="lax",
         path="/api/auth/refresh",
+        max_age=settings.auth.refresh_token_expire_days * 24 * 60 * 60,
     )
 
     return {"detail": "Token refreshed"}
