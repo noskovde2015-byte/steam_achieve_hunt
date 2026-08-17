@@ -107,3 +107,22 @@ async def sync_user_game(user_id: int, appid: int, session: AsyncSession) -> Use
     await session.refresh(user_game)
 
     return user_game
+
+
+async def sync_all_user_games(user_id: int, session: AsyncSession) -> list[UserGame]:
+    stmt = select(User).where(User.id == user_id)
+    result = await session.execute(stmt)
+    user = result.scalar_one()
+
+    user_games = await get_owned_games(steam_id=user.steam_id)
+    res = []
+
+    for game in user_games:
+        try:
+            user_game = await sync_user_game(user.id, game["appid"], session)
+            res.append(user_game)
+        except Exception as e:
+            print(f"Не удалось синхронизировать appid={game['appid']}: {e}")
+            continue
+
+    return res
