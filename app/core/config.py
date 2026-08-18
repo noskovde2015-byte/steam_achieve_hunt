@@ -13,6 +13,7 @@ class ApiPrefix(BaseModel):
     auth_prefix: str = "/auth"
     leaderboard_prefix: str = "/leaderboard"
     profile_prefix: str = "/profile"
+    sync_prefix: str = "/sync"
 
 
 class DataBaseConfig(BaseModel):
