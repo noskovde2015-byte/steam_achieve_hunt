@@ -9,6 +9,10 @@ from app.core.models.game import Game
 from app.core.config import settings
 
 
+class SteamAPIError(Exception):
+    pass
+
+
 async def get_owned_games(steam_id: str) -> list[dict]:
     async with httpx.AsyncClient() as client:
         response = await client.get(
@@ -35,7 +39,14 @@ async def get_player_achievements(steam_id: str, appid: int) -> list[dict]:
             },
         )
     data = response.json()
-    return data["playerstats"]["achievements"]
+
+    playerstats = data.get("playerstats", {})
+    if not playerstats.get("success", False):
+        raise SteamAPIError(
+            f"No achievements data for appid={appid}: {playerstats.get('error')}"
+        )
+
+    return playerstats.get("achievements", [])
 
 
 async def get_schema_for_game(appid: int) -> tuple[str, int]:
@@ -98,10 +109,17 @@ async def sync_user_game(user_id: int, appid: int, session: AsyncSession) -> Use
         user_game = UserGame(user_id=user_id, game_id=game.id)
         session.add(user_game)
 
+    was_platinum = user_game.is_platinum
+
     user_game.achievements_unlocked = unlocked_count
     user_game.is_platinum = is_platinum
     user_game.platinum_at = platinum_time
     user_game.last_synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    if is_platinum and not was_platinum:
+        user.platinum_count += 1
+    elif not is_platinum and was_platinum:
+        user.platinum_count -= 1
 
     await session.commit()
     await session.refresh(user_game)
@@ -121,7 +139,7 @@ async def sync_all_user_games(user_id: int, session: AsyncSession) -> list[UserG
         try:
             user_game = await sync_user_game(user.id, game["appid"], session)
             res.append(user_game)
-        except Exception as e:
+        except (SteamAPIError, httpx.HTTPError) as e:
             print(f"Не удалось синхронизировать appid={game['appid']}: {e}")
             continue
 
