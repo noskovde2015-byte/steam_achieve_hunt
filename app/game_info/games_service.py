@@ -4,6 +4,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models.user_game import UserGame
+from app.core.models.achievements import Achievement
 from app.core.models.user import User
 from app.core.models.game import Game
 from app.core.config import settings
@@ -144,3 +145,38 @@ async def sync_all_user_games(user_id: int, session: AsyncSession) -> list[UserG
             continue
 
     return res
+
+
+async def get_global_achievement_percentages(appid: int) -> dict[str, float]:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/",
+            params={"gameid": appid},
+        )
+    data = resp.json()
+    achievements = data["achievementpercentages"]["achievements"]
+    return {a["name"]: a["percent"] for a in achievements}
+
+
+async def save_achievements_for_game(
+    game_id: int, percentages: dict[str, float], session: AsyncSession
+) -> None:
+    stmt = select(Achievement).where(Achievement.game_id == game_id)
+    result = await session.execute(stmt)
+    existing = result.scalars().all()
+
+    existing_by_name = {a.api_name: a for a in existing}
+
+    for api_name, percent in percentages.items():
+        achievement = existing_by_name.get(api_name)
+
+        if achievement is None:
+            achievement = Achievement(
+                game_id=game_id, api_name=api_name, global_percent=percent
+            )
+            session.add(achievement)
+        else:
+            achievement.global_percent = percent
+            achievement.updated_at = datetime.now(timezone.utc)
+
+    await session.commit()
