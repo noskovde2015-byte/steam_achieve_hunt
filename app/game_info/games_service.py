@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models.user_game import UserGame
 from app.core.models.achievements import Achievement
@@ -66,6 +66,31 @@ async def get_schema_for_game(appid: int) -> tuple[str, int]:
     return game_name, len(achievements)
 
 
+def calculate_points(
+    user_achievements: list[dict],
+    achievements_by_name: dict[str, Achievement],
+) -> int:
+    total_points = 0
+
+    for a in user_achievements:
+        if a["achieved"] != 1:
+            continue
+
+        achievement = achievements_by_name.get(a["apiname"])
+        if achievement is None:
+            continue
+
+        percent = achievement.global_percent
+        if percent <= 0:
+            points = 100
+        else:
+            points = min(100, 100 / percent)
+
+        total_points += points
+
+    return round(total_points)
+
+
 async def sync_user_game(user_id: int, appid: int, session: AsyncSession) -> UserGame:
     stmt = select(User).where(User.id == user_id)
     result = await session.execute(stmt)
@@ -100,6 +125,22 @@ async def sync_user_game(user_id: int, appid: int, session: AsyncSession) -> Use
         game.name = game_name
         game.total_achievements = total_achievements
 
+    stmt = select(func.max(Achievement.updated_at)).where(
+        Achievement.game_id == game.id
+    )
+    result = await session.execute(stmt)
+    latest_update = result.scalar_one_or_none()
+
+    needs_update = latest_update is None or latest_update < datetime.now(
+        timezone.utc
+    ).replace(tzinfo=None) - timedelta(days=7)
+
+    if needs_update:
+        percentages = await get_global_achievement_percentages(appid=appid)
+        await save_achievements_for_game(
+            game_id=game.id, percentages=percentages, session=session
+        )
+
     user_game_stmt = select(UserGame).where(
         UserGame.user_id == user_id, UserGame.game_id == game.id
     )
@@ -121,6 +162,26 @@ async def sync_user_game(user_id: int, appid: int, session: AsyncSession) -> Use
         user.platinum_count += 1
     elif not is_platinum and was_platinum:
         user.platinum_count -= 1
+
+    achievements_by_name = {
+        a.api_name: a
+        for a in (
+            await session.execute(
+                select(Achievement).where(Achievement.game_id == game.id)
+            )
+        )
+        .scalars()
+        .all()
+    }
+
+    points = calculate_points(
+        user_achievements=user_achievements,
+        achievements_by_name=achievements_by_name,
+    )
+
+    old_points = user_game.points_earned
+    user_game.points_earned = 0
+    user.total_points += points - old_points
 
     await session.commit()
     await session.refresh(user_game)
