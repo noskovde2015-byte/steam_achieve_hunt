@@ -148,7 +148,9 @@ async def sync_user_game(user_id: int, appid: int, session: AsyncSession) -> Use
     user_game = user_game_result.scalar_one_or_none()
 
     if user_game is None:
-        user_game = UserGame(user_id=user_id, game_id=game.id)
+        user_game = UserGame(
+            user_id=user_id, game_id=game.id, is_platinum=False, points_earned=0
+        )
         session.add(user_game)
 
     was_platinum = user_game.is_platinum
@@ -216,7 +218,7 @@ async def get_global_achievement_percentages(appid: int) -> dict[str, float]:
         )
     data = resp.json()
     achievements = data["achievementpercentages"]["achievements"]
-    return {a["name"]: a["percent"] for a in achievements}
+    return {a["name"]: float(a["percent"]) for a in achievements}
 
 
 async def save_achievements_for_game(

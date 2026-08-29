@@ -14,6 +14,7 @@ class ApiPrefix(BaseModel):
     leaderboard_prefix: str = "/leaderboard"
     profile_prefix: str = "/profile"
     sync_prefix: str = "/sync"
+    games_prefix: str = "/games"
 
 
 class DataBaseConfig(BaseModel):
