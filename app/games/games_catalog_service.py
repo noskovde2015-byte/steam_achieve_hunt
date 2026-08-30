@@ -34,3 +34,36 @@ async def get_games_catalog(
     total = (await session.execute(count_stmt)).scalar_one()
 
     return games, total
+
+
+def calculate_max_points(achievements: list[Achievement]) -> int:
+    total = 0
+
+    for a in achievements:
+        percent = a.global_percent
+        if percent <= 0:
+            points = 100
+        else:
+            points = min(100, 100 / percent)
+        total += points
+    return round(total)
+
+
+async def get_game_details(appid: int, session: AsyncSession) -> dict | None:
+    stmt = select(Game).where(Game.appid == appid)
+    result = await session.execute(stmt)
+    game = result.scalar_one_or_none()
+
+    if game is None:
+        return None
+
+    achieve_stmt = select(Achievement).where(Achievement.game_id == game.id)
+    result = await session.execute(achieve_stmt)
+    achievements = result.scalars().all()
+
+    max_points = calculate_max_points(achievements=list(achievements))
+    return {
+        "name": game.name,
+        "total_achievements": game.total_achievements,
+        "max_points": max_points,
+    }

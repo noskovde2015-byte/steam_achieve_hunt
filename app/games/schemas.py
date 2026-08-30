@@ -10,3 +10,9 @@ class GameCatalogEntry(BaseModel):
 class GamesCatalogResponse(BaseModel):
     games: list[GameCatalogEntry]
     total: int
+
+
+class GameDetailsResponse(BaseModel):
+    name: str
+    total_achievements: int
+    max_points: int
