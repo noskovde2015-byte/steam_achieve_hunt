@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth.dependencies import get_current_user
 from app.core.config import settings
@@ -10,7 +11,11 @@ router = APIRouter(prefix=settings.api_prefix.sync_prefix, tags=["Sync"])
 
 @router.post("/")
 async def sync_games(
-    user=Depends(get_current_user),
-    session: AsyncSession = Depends(db_helper.session_getter),
+    user=Depends(get_current_user), session=Depends(db_helper.session_getter)
 ):
-    return await sync_all_user_games(session=session, user_id=user.id)
+    try:
+        return await sync_all_user_games(session=session, user_id=user.id)
+    except httpx.HTTPError:
+        raise HTTPException(
+            status_code=502, detail="Steam API is unavailable, try again later"
+        )

@@ -8,6 +8,9 @@ from app.core.models.achievements import Achievement
 from app.core.models.user import User
 from app.core.models.game import Game
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SteamAPIError(Exception):
@@ -204,7 +207,7 @@ async def sync_all_user_games(user_id: int, session: AsyncSession) -> list[UserG
             user_game = await sync_user_game(user.id, game["appid"], session)
             res.append(user_game)
         except (SteamAPIError, httpx.HTTPError) as e:
-            print(f"Не удалось синхронизировать appid={game['appid']}: {e}")
+            logger.warning(f"Не удалось синхронизировать appid={game['appid']}: {e}")
             continue
 
     return res
