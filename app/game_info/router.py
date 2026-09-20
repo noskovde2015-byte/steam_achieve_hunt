@@ -5,17 +5,12 @@ from app.core.config import settings
 from .games_service import sync_all_user_games
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models.db_helper import db_helper
+from app.messaging.rabbitmq import publish_sync_task
 
 router = APIRouter(prefix=settings.api_prefix.sync_prefix, tags=["Sync"])
 
 
 @router.post("/")
-async def sync_games(
-    user=Depends(get_current_user), session=Depends(db_helper.session_getter)
-):
-    try:
-        return await sync_all_user_games(session=session, user_id=user.id)
-    except httpx.HTTPError:
-        raise HTTPException(
-            status_code=502, detail="Steam API is unavailable, try again later"
-        )
+async def sync_games(user=Depends(get_current_user)):
+    await publish_sync_task(user_id=user.id)
+    return {"detail": "Синхронизация запущена"}
