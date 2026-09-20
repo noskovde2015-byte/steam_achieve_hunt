@@ -1,14 +1,15 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from core.config import settings
+from app.core.config import settings
+
 
 class DataBaseHelper:
     def __init__(
-            self,
-            url: str,
-            echo: bool = False,
-            echo_pool: bool = False,
-            max_overflow: int = 10,
-            pool_size: int = 5,
+        self,
+        url: str,
+        echo: bool = False,
+        echo_pool: bool = False,
+        max_overflow: int = 10,
+        pool_size: int = 5,
     ):
         self.engine = create_async_engine(
             url=url,
@@ -31,6 +32,7 @@ class DataBaseHelper:
 
     async def dispose(self):
         await self.engine.dispose()
+
 
 db_helper = DataBaseHelper(
     url=str(settings.db.url),

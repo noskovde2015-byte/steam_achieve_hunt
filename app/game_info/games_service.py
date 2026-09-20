@@ -243,6 +243,6 @@ async def save_achievements_for_game(
             session.add(achievement)
         else:
             achievement.global_percent = percent
-            achievement.updated_at = datetime.now(timezone.utc)
+            achievement.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await session.commit()
