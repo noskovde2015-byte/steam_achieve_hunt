@@ -36,6 +36,17 @@ class JWTConfig(BaseModel):
     refresh_token_expire_days: int
 
 
+class RabbitMQConfig(BaseModel):
+    host: str = "localhost"
+    port: int = 5672
+    user: str = "guest"
+    password: str = "guest"
+
+    @property
+    def url(self) -> str:
+        return f"amqp://{self.user}:{self.password}@{self.host}:{self.port}/"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=Path(__file__).parent.parent / ".env",
@@ -49,6 +60,7 @@ class Settings(BaseSettings):
     db: DataBaseConfig
     steam: SteamConfig
     auth: JWTConfig
+    rabbitmq: RabbitMQConfig = RabbitMQConfig()
 
 
 settings = Settings()
